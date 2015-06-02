@@ -114,21 +114,6 @@ ZNN_THREAD_LOCAL conv_plans_impl& conv_plans = zi::singleton<conv_plans_impl>::i
 
 
 template< typename T >
-inline void convolve_mkl( cube<T> const & a,
-                      cube<T> const & b,
-                      cube<T> & r) noexcept
-{
-    if ( b.num_elements() == 1 )
-    {
-        convolve_constant(a,b.data()[0],r);
-        return;
-    }
-
-    cube_p<T> rp = convolve_mkl( a, b );
-    r = *rp;
-}
-
-template< typename T >
 inline cube_p<T> convolve_mkl( cube<T> const & a,
                            cube<T> const & b)
 {
@@ -156,7 +141,6 @@ inline cube_p<T> convolve_mkl( cube<T> const & a,
 }
 
 
-
 template< typename T >
 inline cube_p<T> convolve_mkl( ccube_p<T> const & a,
                            ccube_p<T> const & b)
@@ -164,6 +148,20 @@ inline cube_p<T> convolve_mkl( ccube_p<T> const & a,
     return convolve(*a, *b);
 }
 
+template< typename T >
+inline void convolve_mkl( cube<T> const & a,
+                      cube<T> const & b,
+                      cube<T> & r) noexcept
+{
+    if ( b.num_elements() == 1 )
+    {
+        convolve_constant(a,b.data()[0],r);
+        return;
+    }
+
+    cube_p<T> rp = convolve_mkl( a, b );
+    r = *rp;
+}
 
 template< typename T >
 inline void convolve_add_mkl( cube<T> const & a,

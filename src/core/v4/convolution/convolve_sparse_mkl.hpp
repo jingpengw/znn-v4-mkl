@@ -49,51 +49,51 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
     const int mode = VSL_CONV_MODE_DIRECT;//direct convolution--DIRECT, FFT
 
     // the kernel
-    MKL_INT tbshape[3]={bz, by, bx};
+    MKL_INT tbshape[3]={bx, by, bz};
 
     int start[3]={tbshape[0]-1, tbshape[1]-1,tbshape[2]-1};
-    //std::cout<< "start: "<<start[0]<<", "<<start[1]<<", "<<start[2]<<std::endl;
+    std::cout<< "start: "<<start[0]<<", "<<start[1]<<", "<<start[2]<<std::endl;
 
     // temporal volume size
-    MKL_INT tashape[3]={(az-1)/s[2]+1, (ay-1)/s[1]+1, (ax-1)/s[0]+1};
+    MKL_INT tashape[3]={ (ax-1)/s[0]+1, (ay-1)/s[1]+1, (az-1)/s[2]+1};
     MKL_INT trshape[3]={tashape[0]-tbshape[0]+1, tashape[1]-tbshape[1]+1, tashape[2]-tbshape[2]+1};
 
     // temporal subconvolution output
-    double ta[ tashape[0]* tashape[1]* tashape[2] ];
-    double tr[ trshape[0]* trshape[1]* trshape[2] ];
+    cube_p<real> tap = get_cube<real>(vec3i(tashape[0], tashape[1], tashape[2]));
+    cube_p<real> trp = get_cube<real>(vec3i(trshape[0], trshape[1], trshape[2]));
+    cube<real> ta = *tap;
+    cube<real> tr = *trp;
 
     // sparseness
     for (int xs=0; xs<s[0]; xs++)
         for (int ys=0; ys<s[1]; ys++)
             for (int zs=0; zs<s[2]; zs++)
             {
+                std::cout<<"sparse coordinate: "<< xs <<","<< ys <<","<< zs <<std::endl;
                 // temporal volume size
-                MKL_INT tashape[3]={(az-zs-1)/s[2]+1, (ay-ys-1)/s[1]+1, (ax-xs-1)/s[0]+1};
+                MKL_INT tashape[3]={(ax-xs-1)/s[0]+1, (ay-ys-1)/s[1]+1, (ay-ys-1)/s[2]+1};
                 MKL_INT trshape[3]={tashape[0]-tbshape[0]+1, tashape[1]-tbshape[1]+1, tashape[2]-tbshape[2]+1};
 
                 // prepare input
                 for (std::size_t x=xs, xt=0; x<ax; x+=s[0], xt++)
                     for (std::size_t y=ys, yt=0; y<ay; y+=s[1], yt++)
                         for(std::size_t z=zs, zt=0; z<az; z+=s[2], zt++)
-                            ta[ zt+ yt*tashape[0] + xt*tashape[1]*tashape[0] ] = a[x][y][z];
+                            ta[xt][yt][zt] = a[x][y][z];
 
                 // subconvolution
-                //std::cout<<"subconvolution..."<<std::endl;
-                status = vsldConvNewTask(&task,mode,dims,tashape, tbshape, trshape);
-                //std::cout<<"status-->new task:          "<<status<<std::endl;
-                status = vslConvSetStart(task, start);
-                //std::cout<<"status-->set start:         "<<status<<std::endl;
-                status = vsldConvExec(task, ta, NULL, b.data(), NULL, tr, NULL);
-                //std::cout<<"status-->conv exec:         "<<status<<std::endl;
-                status = vslConvDeleteTask(&task);
-                //std::cout<<"status-->conv delete task:  "<<status<<std::endl;
+                std::cout << "input shape: "<<ta.shape()[0] <<","<<ta.shape()[1]<<","<<ta.shape()[2]<<std::endl;
+                std::cout << "input shape: "<< b.shape()[0] <<","<< b.shape()[1]<<","<< b.shape()[2]<<std::endl;
+                std::cout << "input shape: "<<tr.shape()[0] <<","<<tr.shape()[1]<<","<<tr.shape()[2]<<std::endl;
+                convolve_mkl( ta, b, tr );
+                std::cout << "finished!" << std::endl;
 
                 // combine subconvolution results
                 for (std::size_t x=xs, wx=0; x<rx; x+=s[0], wx++)
                     for (std::size_t y=ys, wy=0; y<ry; y+=s[1], wy++ )
                         for (std::size_t z=zs, wz=0; z<rz; z+=s[2], wz++)
-                            r[x][y][z] = tr[wz + wy*trshape[0] + wx*trshape[1]*trshape[0] ];
+                            r[x][y][z] = tr[wx][wy][wz];
             }
+    std::cout<<"sparse convolution complete!"<<std::endl;
 }
 
 template< typename T >
@@ -127,6 +127,7 @@ inline cube_p<T> convolve_sparse_mkl( cube<T> const & a,
 
     fill(*r,0);
     convolve_sparse_add_mkl(a,b,s,*r);
+    std::cout<<"finished one sparse convolution!"<<std::endl;
     return r;
 }
 
