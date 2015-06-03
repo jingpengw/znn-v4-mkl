@@ -59,7 +59,7 @@ int main(int argc, char** argv)
     // sparseness
     vec3i s(sx,sy,sz);
     cube_p<real> r1 = convolve_sparse(v,f,s);
-    cube_p<real> r2 = convolve_sparse_mkl(*v,*f,s);
+    cube_p<real> r2 = convolve_sparse(v,f,s);
 
     std::cout<< "r2 size: "<<r2->shape()[0]<<std::endl;
 
