@@ -75,7 +75,6 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
                             r[x][y][z] = tr[wz + wy*trshape[0] + wx*trshape[1]*trshape[0] ];
 
             }
-    std::cout<<"sparse convolution complete!"<<std::endl;
 }
 
 template< typename T >
@@ -109,7 +108,6 @@ inline cube_p<T> convolve_sparse_mkl( cube<T> const & a,
 
     fill(*r,0);
     convolve_sparse_add_mkl(a,b,s,*r);
-    std::cout<<"finished one sparse convolution!"<<std::endl;
     return r;
 }
 
