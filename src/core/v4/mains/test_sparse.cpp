@@ -52,6 +52,13 @@ int main(int argc, char** argv)
 
     for ( uint64_t i = 0; i < v->num_elements(); ++i )
         v->data()[i] = i;//(i%100)/100;
+    // auto va = *v;
+    // for (int z = 0; z<va.shape()[2]; z++)
+    //     for (int y = 0; y<va.shape()[1]; y++)
+    //         for (int x = 0; x<va.shape()[0]; x++)
+    //         {
+    //             std::cout<<"x,y,z,value: "<<x<<", "<<y<<", "<<", "<<z<<", "<<va[x][y][z]<<std::endl;
+    //         }
 
     for ( uint64_t i = 0; i < f->num_elements(); ++i )
         f->data()[i] = (i%100)/10;
@@ -76,6 +83,15 @@ int main(int argc, char** argv)
         r2  = convolve_sparse_mkl(v,f,s);
     }
     std::cout << "mkl   elapsed: " << wt.elapsed<double>() << std::endl;
+
+    std::cout<< "pairwise comparison to detect difference..."<<std::endl;
+    for ( uint64_t i = 0; i < r1->num_elements(); ++i )
+    {
+        if( r1->data()[i] != r2->data()[i] )
+            std::cout<< "the result is different: "<< r1->data()[i] << "!=" << r2->data()[i]<<std::endl;
+        // else
+        //     std::cout<< "the value is the same: "<< r1->data()[i] << "==" << r2->data()[i]<<std::endl;
+    }
     std::cout << "Sum compare (naive VS mkl): " << sum(*r1) << "==" << sum(*r2) << " ?" <<std::endl;
 
 }

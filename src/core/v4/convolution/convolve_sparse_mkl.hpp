@@ -29,6 +29,7 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
     size_t bx = b.shape()[0];
     size_t by = b.shape()[1];
     size_t bz = b.shape()[2];
+    std::cout<<"filter size (z,y,x): "<<bz<<", "<<by<<", "<<bx<<std::endl;
 
     size_t rx = ax - (bx-1)*s[0];
     size_t ry = ay - (by-1)*s[1];
@@ -38,8 +39,8 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
     ZI_ASSERT(r.shape()[1]==ry);
     ZI_ASSERT(r.shape()[2]==rz);
 
-    const MKL_INT strides_in[3]  = { ax*ay*s[2], ax*s[1], s[0] };
-    const MKL_INT strides_out[3] = { rx*ry*s[2], rx*s[1], s[0] };
+    const MKL_INT strides_in[3]  = { s[2], az*s[1], az*ay*s[0] };
+    const MKL_INT strides_out[3] = { s[2], rz*s[1], rz*ry*s[0] };
     std::cout<<"stride in : "<< strides_in[0]  << "," << strides_in[1]  << "," << strides_in[2]  <<std::endl;
     std::cout<<"stride out: "<< strides_out[0] << "," << strides_out[1] << "," << strides_out[2] <<std::endl;
 
@@ -48,23 +49,20 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
         for (int ys=0; ys<s[1]; ys++)
             for (int zs=0; zs<s[2]; zs++)
             {
-                vec3i in_size( (ax-1)/s[0] + (xs == 0 ? 1 : 0),
-                               (ay-1)/s[1] + (ys == 0 ? 1 : 0),
-                               (az-1)/s[2] + (zs == 0 ? 1 : 0) );
+                // image and filter size
+                vec3i img_size( az, ay, ax );
+                vec3i flt_size( bz, by, bx);
+                // out_size[0] = (out_size[0]<=0 ? 1:out_size[0]);
+                // out_size[1] = (out_size[1]<=0 ? 1:out_size[1]);
+                // out_size[2] = (out_size[2]<=0 ? 1:out_size[2]);
 
-                vec3i out_size(in_size[0] + 1 - bx,
-                               in_size[1] + 1 - by,
-                               in_size[2] + 1 - bz);
-                // if( out_size[0]<=0 || out_size[1]<=0 || out_size[2]<=0 )
-                //     continue;
-
-                std::cout<<"in  size: "<< in_size[0]  << "," << in_size[1]  << "," << in_size[2]  <<std::endl;
-                std::cout<<"out size: "<< out_size[0] << "," << out_size[1] << "," << out_size[2] <<std::endl;
+                std::cout<<"image  size: "<< img_size[0] << "," << img_size[1] << "," << img_size[2] <<std::endl;
+                std::cout<<"filter size: "<< flt_size[0] << "," << flt_size[1] << "," << flt_size[2] <<std::endl;
 
                 const T* in_ptr  = &(a[xs][ys][zs]);
                 T* out_ptr = &(r[xs][ys][zs]);
 
-                int status = vsldConvExec(conv_plans.get(in_size, out_size),
+                int status = vsldConvExec(conv_plans.get(img_size, flt_size),
                                           in_ptr, strides_in,
                                           b.data(), NULL,
                                           out_ptr, strides_out);
