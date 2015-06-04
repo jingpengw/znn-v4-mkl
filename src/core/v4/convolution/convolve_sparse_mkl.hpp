@@ -38,43 +38,39 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
     ZI_ASSERT(r.shape()[1]==ry);
     ZI_ASSERT(r.shape()[2]==rz);
 
-    // 3d convolution using MKL
-    // temporal volume size
-    MKL_INT tashape[3]={(az-1)/s[2]+1, (ay-1)/s[1]+1, (ax-1)/s[0]+1};
-    MKL_INT trshape[3]={tashape[0]-bz+1, tashape[1]-by+1, tashape[2]-bx+1};
-
-    // temporal subconvolution output
-    double ta[ tashape[0]* tashape[1]* tashape[2] ];
-    double tr[ trshape[0]* trshape[1]* trshape[2] ];
+    const MKL_INT strides_in[3]  = { ax*ay*s[2], ax*s[1], s[0] };
+    const MKL_INT strides_out[3] = { rx*ry*s[2], rx*s[1], s[0] };
+    std::cout<<"stride in : "<< strides_in[0]  << "," << strides_in[1]  << "," << strides_in[2]  <<std::endl;
+    std::cout<<"stride out: "<< strides_out[0] << "," << strides_out[1] << "," << strides_out[2] <<std::endl;
 
     // sparseness
     for (int xs=0; xs<s[0]; xs++)
         for (int ys=0; ys<s[1]; ys++)
             for (int zs=0; zs<s[2]; zs++)
             {
-                // temporal volume size
-                MKL_INT tashape[3]={(az-zs-1)/s[2]+1, (ay-ys-1)/s[1]+1, (ax-xs-1)/s[0]+1};
-                MKL_INT trshape[3]={tashape[0]-bz+1, tashape[1]-by+1, tashape[2]-bx+1};
+                vec3i in_size( (ax-1)/s[0] + (xs == 0 ? 1 : 0),
+                               (ay-1)/s[1] + (ys == 0 ? 1 : 0),
+                               (az-1)/s[2] + (zs == 0 ? 1 : 0) );
 
-                // prepare input
-                for (std::size_t x=xs, xt=0; x<ax; x+=s[0], xt++)
-                    for (std::size_t y=ys, yt=0; y<ay; y+=s[1], yt++)
-                        for(std::size_t z=zs, zt=0; z<az; z+=s[2], zt++)
-                            ta[ zt+ yt*tashape[0] + xt*tashape[1]*tashape[0] ] = a[x][y][z];
+                vec3i out_size(in_size[0] + 1 - bx,
+                               in_size[1] + 1 - by,
+                               in_size[2] + 1 - bz);
+                // if( out_size[0]<=0 || out_size[1]<=0 || out_size[2]<=0 )
+                //     continue;
 
-                //std::cout<<"status-->conv delete task:  "<<status<<std::endl;
-                int status = vsldConvExec(conv_plans.get(vec3i(tashape[0], tashape[1], tashape[2]), vec3i(bz,by,bx)),
-                                          ta, NULL,
+                std::cout<<"in  size: "<< in_size[0]  << "," << in_size[1]  << "," << in_size[2]  <<std::endl;
+                std::cout<<"out size: "<< out_size[0] << "," << out_size[1] << "," << out_size[2] <<std::endl;
+
+                const T* in_ptr  = &(a[xs][ys][zs]);
+                T* out_ptr = &(r[xs][ys][zs]);
+
+                int status = vsldConvExec(conv_plans.get(in_size, out_size),
+                                          in_ptr, strides_in,
                                           b.data(), NULL,
-                                          tr, NULL);
-
-                // combine subconvolution results
-                for (std::size_t x=xs, wx=0; x<rx; x+=s[0], wx++)
-                    for (std::size_t y=ys, wy=0; y<ry; y+=s[1], wy++ )
-                        for (std::size_t z=zs, wz=0; z<rz; z+=s[2], wz++)
-                            r[x][y][z] = tr[wz + wy*trshape[0] + wx*trshape[1]*trshape[0] ];
+                                          out_ptr, strides_out);
 
             }
+    std::cout<<"convolution complete!" << std::endl;
 }
 
 template< typename T >
