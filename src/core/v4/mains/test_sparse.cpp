@@ -1,6 +1,6 @@
 // #include "network/parallel/network.hpp"
 #include "convolution/convolve_sparse.hpp"
-#include "convolution/convolve_sparse_mkl.hpp"
+#include "convolution/convolve_sparse_mkl_V1.hpp"
 #include <zi/time.hpp>
 
 using namespace znn::v4;
