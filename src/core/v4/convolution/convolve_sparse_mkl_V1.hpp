@@ -64,7 +64,8 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
             {
                 // temporal volume size
                 MKL_INT tashape[3]={(az-zs-1)/s[2]+1, (ay-ys-1)/s[1]+1, (ax-xs-1)/s[0]+1};
-                MKL_INT trshape[3]={tashape[0]-tbshape[0]+1, tashape[1]-tbshape[1]+1, tashape[2]-tbshape[2]+1};
+                // MKL_INT trshape[3]={tashape[0]-tbshape[0]+1, tashape[1]-tbshape[1]+1, tashape[2]-tbshape[2]+1};
+                MKL_INT trshape[3]={rz, ry, rx};
 
                 const T* in_ptr  = &(a[xs][ys][zs]);
                 T* out_ptr = &(r[xs][ys][zs]);

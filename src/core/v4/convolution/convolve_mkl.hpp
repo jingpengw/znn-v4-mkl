@@ -9,43 +9,44 @@
 
 namespace znn { namespace v4 {
 
-class single_size_conv_plans
+class single_size_conv_plan
 {
 private:
     std::mutex                      m1       ;
     std::mutex                      m2       ;
-    MKL_INT                         shape[3] ;
-    std::map<vec3i, VSLConvTaskPtr> plans1   ;
-    std::map<vec3i, VSLConvTaskPtr> plans2   ;
+    MKL_INT                         ashape[3];
+    MKL_INT                         bshape[3];
+    MKL_INT                         rshape[3];
 
 public:
-    single_size_conv_plans( vec3i const & s )
+    single_size_conv_plan( vec9i const & s )
     {
-        shape[0] = s[0];
-        shape[1] = s[1];
-        shape[2] = s[2];
+        ashape[0] = s[0];
+        ashape[1] = s[1];
+        ashape[2] = s[2];
+
+        bshape[0] = s[3];
+        bshape[1] = s[4];
+        bshape[2] = s[5];
+
+        rshape[0] = s[6];
+        rshape[1] = s[7];
+        rshape[2] = s[8];
     }
 
-    VSLConvTaskPtr get( vec3i const & s )
+    VSLConvTaskPtr get()
     {
         guard g(m1);
-        VSLConvTaskPtr& task = plans1[s];
-        if ( task ) return task;
-
         int status;
-        const int start[3]={s[0]-1,s[1]-1,s[2]-1};
-
-        MKL_INT bshape[3] = { s[0], s[1], s[2] };
-        MKL_INT rshape[3] = { shape[0] + 1 - s[0],
-                              shape[1] + 1 - s[1],
-                              shape[2] + 1 - s[2] };
+        VSLConvTaskPtr task;
+        const int start[3]={bshape[0]-1,bshape[1]-1,bshape[2]-1};
 
 #ifdef ZNN_USE_FLOATS
         status = vslsConvNewTask(&task,VSL_CONV_MODE_DIRECT,3,
-                                 shape, bshape, rshape);
+                                 ashape, bshape, rshape);
 #else
         status = vsldConvNewTask(&task,VSL_CONV_MODE_DIRECT,3,
-                                 shape, bshape, rshape);
+                                 ashape, bshape, rshape);
 #endif
         status = vslConvSetStart(task, start);
         return task;
@@ -53,27 +54,19 @@ public:
 
     VSLConvTaskPtr get_inv( vec3i const & s )
     {
-        guard g(m2);
-        VSLConvTaskPtr& task = plans2[s];
-        if ( task ) return task;
-
+        guard g(m1);
         int status;
-        const int start[3]={0,0,0};
-
-        MKL_INT bshape[3] = { s[0], s[1], s[2] };
-        MKL_INT rshape[3] = { shape[0] + s[0] - 1,
-                              shape[1] + s[1] - 1,
-                              shape[2] + s[2] - 1};
+        VSLConvTaskPtr task;
+        const int start[3]={bshape[0]-1,bshape[1]-1,bshape[2]-1};
 
 #ifdef ZNN_USE_FLOATS
         status = vslsConvNewTask(&task,VSL_CONV_MODE_DIRECT,3,
-                                 shape, bshape, rshape);
+                                 ashape, bshape, rshape);
 #else
         status = vsldConvNewTask(&task,VSL_CONV_MODE_DIRECT,3,
-                                 shape, bshape, rshape);
+                                 ashape, bshape, rshape);
 #endif
         status = vslConvSetStart(task, start);
-
         return task;
     }
 };
@@ -81,28 +74,50 @@ public:
 class conv_plans_impl
 {
 private:
-    std::mutex                               m       ;
-    std::map<vec3i, single_size_conv_plans*> pools   ;
+    std::mutex                               m  ;
+    std::map<vec9i, single_size_conv_plan*> pool;
 
-    single_size_conv_plans* get_pool(vec3i const & s)
+    single_size_conv_plan* get_pool(vec9i const & shape)
     {
-        typedef single_size_conv_plans* single_size_conv_plans_ptr;
+        typedef single_size_conv_plan* single_size_conv_plan_ptr;
         guard g(m);
-        single_size_conv_plans_ptr& r = pools[s];
-        if ( r ) return r;
-        r = new single_size_conv_plans(s);
-        return r;
+        single_size_conv_plan_ptr& plan_ptr = pool[shape];
+        if ( plan_ptr ) return plan_ptr;
+        plan_ptr = new single_size_conv_plan(shape);
+        return plan_ptr;
+    }
+
+    single_size_conv_plan* get_pool(vec3i const & a, vec3i const & b, vec3i const & r)
+    {
+        vec9i shape;
+        shape[0] = a[0];
+        shape[1] = a[1];
+        shape[2] = a[2];
+        shape[3] = b[0];
+        shape[4] = b[1];
+        shape[5] = b[2];
+        shape[6] = r[0];
+        shape[7] = r[1];
+        shape[8] = r[2];
+        return get_pool(shape);
     }
 
 public:
+    VSLConvTaskPtr get(vec3i const & a, vec3i const & b, vec3i const & r)
+    {
+        return get_pool(a,b,r)->get();
+    }
+
     VSLConvTaskPtr get(vec3i const & a, vec3i const & b)
     {
-        return get_pool(a)->get(b);
+        vec3i r(a[0]-b[0]+1, a[1]-b[1]+1, a[2]-b[2]+1);
+        return get_pool(a,b,r)->get();
     }
 
     VSLConvTaskPtr get_inv(vec3i const & a, vec3i const & b)
     {
-        return get_pool(a)->get_inv(b);
+        vec3i r(a[0]-b[0]+1, a[1]-b[1]+1, a[2]-b[2]+1);
+        return get_pool(a,b,r)->get();
     }
 
 };
@@ -110,8 +125,6 @@ public:
 namespace {
 ZNN_THREAD_LOCAL conv_plans_impl& conv_plans = zi::singleton<conv_plans_impl>::instance();
 } // anonymous namespace
-
-
 
 template< typename T >
 inline cube_p<T> convolve_mkl( cube<T> const & a,

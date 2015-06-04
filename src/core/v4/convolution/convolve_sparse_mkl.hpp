@@ -29,7 +29,6 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
     size_t bx = b.shape()[0];
     size_t by = b.shape()[1];
     size_t bz = b.shape()[2];
-    std::cout<<"filter size (z,y,x): "<<bz<<", "<<by<<", "<<bx<<std::endl;
 
     size_t rx = ax - (bx-1)*s[0];
     size_t ry = ay - (by-1)*s[1];
@@ -41,34 +40,27 @@ inline void convolve_sparse_add_mkl(    cube<T> const   & a,
 
     const MKL_INT strides_in[3]  = { s[2], az*s[1], az*ay*s[0] };
     const MKL_INT strides_out[3] = { s[2], rz*s[1], rz*ry*s[0] };
-    std::cout<<"stride in : "<< strides_in[0]  << "," << strides_in[1]  << "," << strides_in[2]  <<std::endl;
-    std::cout<<"stride out: "<< strides_out[0] << "," << strides_out[1] << "," << strides_out[2] <<std::endl;
+    // std::cout<<"stride in : "<< strides_in[0]  << "," << strides_in[1]  << "," << strides_in[2]  <<std::endl;
+    // std::cout<<"stride out: "<< strides_out[0] << "," << strides_out[1] << "," << strides_out[2] <<std::endl;
 
     // sparseness
     for (int xs=0; xs<s[0]; xs++)
         for (int ys=0; ys<s[1]; ys++)
             for (int zs=0; zs<s[2]; zs++)
             {
-                // image and filter size
-                vec3i img_size( az, ay, ax );
-                vec3i flt_size( bz, by, bx);
-                // out_size[0] = (out_size[0]<=0 ? 1:out_size[0]);
-                // out_size[1] = (out_size[1]<=0 ? 1:out_size[1]);
-                // out_size[2] = (out_size[2]<=0 ? 1:out_size[2]);
-
-                std::cout<<"image  size: "<< img_size[0] << "," << img_size[1] << "," << img_size[2] <<std::endl;
-                std::cout<<"filter size: "<< flt_size[0] << "," << flt_size[1] << "," << flt_size[2] <<std::endl;
+                // input and output size
+                vec3i is( (az-zs-1)/s[2]+1, (ay-ys-1)/s[1]+1, (ax-xs-1)/s[0]+1 );
+                vec3i os( is[0]-bz+1, is[1]-by+1, is[2]-bx+1 );
 
                 const T* in_ptr  = &(a[xs][ys][zs]);
                 T* out_ptr = &(r[xs][ys][zs]);
 
-                int status = vsldConvExec(conv_plans.get(img_size, flt_size),
+                int status = vsldConvExec(conv_plans.get( is, vec3i(bz,by,bx), os),
                                           in_ptr, strides_in,
                                           b.data(), NULL,
                                           out_ptr, strides_out);
 
             }
-    std::cout<<"convolution complete!" << std::endl;
 }
 
 template< typename T >
